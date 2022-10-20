@@ -69,8 +69,11 @@
 
 (defun erl/close-format-window ()
   ""
-  (kill-buffer "*Async efmt*")
-  (delete-other-windows))
+  (let
+      ((the-window
+        (get-buffer-window "*Async efmt*")))
+    (select-window the-window)
+    (kill-buffer-and-window)))
 
 (defun erl/format-cmd (module)
     (format "cd %s && /Users/bryanmccoid/dev/workspace/efmt/target/release/efmt -w --allow-partial-failure %s"
@@ -87,34 +90,94 @@
     (set-process-sentinel process 'formatter-sentinel)
     (setq new-window (split-window-below 60))
     (set-window-buffer new-window "*Async efmt*" t)
-    (other-window 1)
+    (other-window 1 nil t)
     (set-process-query-on-exit-flag process nil)
     (local-set-key [t] 'erl/kill-async-formatter))
   (revert-buffer t t t))
 
-;; (defclass person () ; No superclasses
-;;   ((name :initarg :name
-;;          :initform ""
-;;          :type string
-;;          :custom string
-;;          :documentation "The name of a person.")
-;;    (birthday :initarg :birthday
-;;              :initform "Jan 1, 1970"
-;;              :custom string
-;;              :type string
-;;              :documentation "The person's birthday.")
-;;    (phone :initarg :phone
-;;           :initform ""
-;;           :documentation "Phone number."))
-;;   "A class for tracking people I know.")
+;; ##############################################
 
-;; (cl-defmethod call-person ((pers person) &optional scriptname)
-;;   "Dial the phone for the person PERS.
-;; Execute the program SCRIPTNAME to dial the phone."
-;;   (message "Dialing the phone for %s"  (slot-value pers 'name))
-;;   (shell-command (concat (or scriptname "dialphone.sh")
-;;                          " "
-;;                          (slot-value pers 'phone))))
+(defun formatter-sentinel-generic (process event)
+  (print process)
+  (print event)
+  (message event)
+  (when (string-match-p "finished" event)
+    (message "successfully ran command on buffer.. closing")
+    (close-window async-cmd-buffer)))
 
-;; (setq pers (person :name "Bryan" :birthday "June" :phone "555-5555"))
-;; (call-person pers)
+
+(defun format-buf-name (cmd)
+    (format "*Async %s*" cmd))
+
+(defun run-cmd-async-close-success (cmd)
+  "Runs command on current file"
+  (interactive)
+  (let* ((file-name (shell-quote-argument (buffer-file-name)))
+         (buf-name (format-buf-name cmd))
+         (process (start-process-shell-command
+                   cmd buf-name cmd))
+         (win-size (window-size)))
+    (set-process-sentinel process 'formatter-sentinel-generic)
+    (if (> win-size 60)
+        (message "window is large enough")
+      (message "else branch, window is too small: %s" win-size))
+    (setq new-window (split-window-below 60))
+    (set-window-buffer new-window buf-name t)
+    (other-window 1 nil t)
+    (setq async-cmd-buffer buf-name)
+    (set-process-query-on-exit-flag process nil)
+    (local-set-key [t] 'kill-async-cmd-buffer)))
+
+(defun kill-async-cmd-buffer ()
+  (message "Async command buffer: '%s'" async-cmd-buffer)
+  (interactive)
+  (close-window async-cmd-buffer))
+
+(defun close-window (buf-name)
+  ""
+  (let
+      ((the-window
+        (get-buffer-window buf-name)))
+    (message "window: %s" the-window)
+    (select-window the-window)
+    (kill-buffer-and-window)))
+
+;; ##############################################
+
+(defun erl/ttest ()
+  (run-cmd-async-close-success "cat"))
+
+;; ##############################################
+
+(defclass async-split-below-cmd () ; No superclasses
+  ((name :initarg :name
+         :initform ""
+         :type string
+         :custom string
+         :documentation "The name of a command.")
+   (cmd :initarg :cmd
+             :initform "ls"
+             :custom string
+             :type string
+             :documentation "The actual command to be run.")
+   (uses-buffer :initarg :uses-buffer
+        :initform nil
+        :type boolean
+        :documentation "The actual command to be run.")
+   (env :initarg :env
+          :initform ""
+          :documentation "The environment to use."))
+  "A class for creating and operating on async commands that split a small
+window below and then close on success.")
+
+(cl-defmethod call-command ((cmd async-split-below-cmd) &optional rest)
+  "Call command on async-split-below-cmd."
+  (message "Running command: %s"  (slot-value cmd 'name))
+  (run-cmd-async-close-success (slot-value cmd 'cmd)))
+
+(setq command
+      (async-split-below-cmd
+       :name "list files"
+       :cmd "ls -lap"
+       :uses-buffer t))
+(call-command command)
