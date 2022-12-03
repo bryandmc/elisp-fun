@@ -1,8 +1,13 @@
-;; Some comment here
+;; One of these two should be used?
+;; (require 'async-cmd)
+;; (autoload 'async-split-below-cmd "async-cmd")
+(require 'async-split-below-cmd "async-cmd")
 
+;;;###autoload
 ;; @doc expand erlang macro's
 (defun erl/expand-macro ()
   (interactive)
+  (setv something else here)
   (print "expand macro"))
 
 (defun project-root-pls ()
@@ -48,136 +53,160 @@
     (message the-cmd))
   (print "done."))
 
-;; Example let form so that I don't keep forgetting it.
-;;
-;; (let ((var-name (format "%s" "something")))
-;;   (message var-name))
-
-;; *******************************
-
-(defun formatter-sentinel (process event)
-  (print process)
-  (print event)
-  (message event)
-  (when (string-match-p "finished" event)
-    (message "successfully formatted buffer.. closing")
-    (erl/close-format-window)))
-
-(defun erl/kill-async-formatter ()
-  (interactive)
-  (erl/close-format-window))
-
-(defun erl/close-format-window ()
-  ""
-  (let
-      ((the-window
-        (get-buffer-window "*Async efmt*")))
-    (select-window the-window)
-    (kill-buffer-and-window)))
-
-(defun erl/format-cmd (module)
-    (format "cd %s && /Users/bryanmccoid/dev/workspace/efmt/target/release/efmt -w --allow-partial-failure %s"
-            (project-root-pls) module))
-
-(defun erl/format ()
-  "Runs erlang formatter on current file"
-  (interactive)
-  (let* ((file-name (shell-quote-argument (buffer-file-name)))
-         (process (start-process-shell-command
-                   "efmt"
-                   "*Async efmt*"
-                   (erl/format-cmd file-name))))
-    (set-process-sentinel process 'formatter-sentinel)
-    (setq new-window (split-window-below 60))
-    (set-window-buffer new-window "*Async efmt*" t)
-    (other-window 1 nil t)
-    (set-process-query-on-exit-flag process nil)
-    (local-set-key [t] 'erl/kill-async-formatter))
-  (revert-buffer t t t))
-
-;; ##############################################
-
-(defun formatter-sentinel-generic (process event)
-  (print process)
-  (print event)
-  (message event)
-  (when (string-match-p "finished" event)
-    (message "successfully ran command on buffer.. closing")
-    (close-window async-cmd-buffer)))
-
-
-(defun format-buf-name (cmd)
-    (format "*Async %s*" cmd))
-
-(defun run-cmd-async-close-success (cmd)
-  "Runs command on current file"
-  (interactive)
-  (let* ((file-name (shell-quote-argument (buffer-file-name)))
-         (buf-name (format-buf-name cmd))
-         (process (start-process-shell-command
-                   cmd buf-name cmd))
-         (win-size (window-size)))
-    (set-process-sentinel process 'formatter-sentinel-generic)
-    (if (> win-size 60)
-        (message "window is large enough")
-      (message "else branch, window is too small: %s" win-size))
-    (setq new-window (split-window-below 60))
-    (set-window-buffer new-window buf-name t)
-    (other-window 1 nil t)
-    (setq async-cmd-buffer buf-name)
-    (set-process-query-on-exit-flag process nil)
-    (local-set-key [t] 'kill-async-cmd-buffer)))
-
-(defun kill-async-cmd-buffer ()
-  (message "Async command buffer: '%s'" async-cmd-buffer)
-  (interactive)
-  (close-window async-cmd-buffer))
-
-(defun close-window (buf-name)
-  ""
-  (let
-      ((the-window
-        (get-buffer-window buf-name)))
-    (message "window: %s" the-window)
-    (select-window the-window)
-    (kill-buffer-and-window)))
-
-;; ##############################################
 
 (defun erl/ttest ()
-  (run-cmd-async-close-success "cat"))
+  (interactive)
+  (let ((command
+         (async-split-below-cmd :name "list files"
+                                :cmd (format "cd ../%s && T_WILDCARD=%s make test"
+                                             (project-root-pls)
+                                             (spacemacs/copy-file-name-base)))))
+    (call-command command)
+    (message "INSIDE: %s" command))
+  (message "OUTSIDE"))
 
-;; ##############################################
+(cl-defstruct test-struct
+  ;; ‘thing'
+  (field (make-hash-table :test 'equal))
 
-(defclass async-split-below-cmd () ; No superclasses
-  ((name :initarg :name
-         :initform ""
-         :type string
-         :custom string
-         :documentation "The name of a command.")
-   (cmd :initarg :cmd
-             :initform "ls"
-             :custom string
-             :type string
-             :documentation "The actual command to be run.")
-   (uses-buffer :initarg :uses-buffer
-        :initform nil
-        :type boolean
-        :documentation "The actual command to be run.")
-   (env :initarg :env
-          :initform ""
-          :documentation "The environment to use."))
-  "A class for creating and operating on async commands that split a small
-window below and then close on success.")
+  major-modes ()
+  ;; Function that will be called to decide if this language client
+  ;; should manage a particular buffer. The function will be passed
+  ;; the file name and major mode to inform the decision. Setting
+  ;; `activation-fn' will override `major-modes', if
+  ;; present.
 
-(cl-defmethod call-command ((cmd async-split-below-cmd) &optional rest)
-  "Call command on async-split-below-cmd."
-  (message "Running command: %s"  (slot-value cmd 'name))
-  (run-cmd-async-close-success (slot-value cmd 'cmd)))
+  activation-fn nil)
 
-(setq command
-      (async-split-below-cmd
-       :name "list files"
-       :cmd "ls -lap"
-       :uses-buffer t))
-(call-command command)
+(test-struct-p t)
+
+;; Example call
+;; (erl/ttest)
+
+(defun convert-list-to-string (list)
+  "Convert LIST to string."
+  (let* ((string-with-parenthesis (format "%S" list))
+         (end (- (length string-with-parenthesis) 2)))
+    (substring string-with-parenthesis 2 end)))
+
+(defun os-walk (root)
+  (let ((files '()) ;empty list to store results
+        (current-list (directory-files root t)))
+    ;;process current-list
+    (while current-list
+      (let ((fn (car current-list))) ; get next entry
+        (cond
+         ;; regular files
+         ((file-regular-p fn)
+          (add-to-list 'files fn))
+         ;; directories
+         ((and
+           (file-directory-p fn)
+           ;; ignore . and ..
+           (not (string-equal ".." (substring fn -2)))
+           (not (string-equal "." (substring fn -1))))
+          ;; we have to recurse into this directory
+          (setq files (append files (os-walk fn))))
+         )
+        ;; cut list down by an element
+        (setq current-list (cdr current-list)))
+      )
+    files))
+
+(require 'cl)
+
+(defun full-os-walk (directory-name &rest)
+  (mapcar
+   (lambda (x) (princ (format " - [[%s][%s]]\n" x (file-relative-name x "."))))
+   (remove-if-not
+    (lambda (x) (string= (file-name-extension x) "org"))
+    (sort (os-walk directory-name) (lambda (a b) (string< (convert-list-to-string a) (convert-list-to-string b)))))))
+
+(defun convert-list-to-string (list)
+      "Convert LIST to string."
+      (let* ((string-with-parenthesis (format "%S" list))
+             (end (- (length string-with-parenthesis) 2)))
+        (substring string-with-parenthesis 2 end)))
+
+(defun os-walk (root)
+  (let ((files '()) ;empty list to store results
+        (current-list (directory-files root t)))
+    ;;process current-list
+    (while current-list
+      (let ((fn (car current-list))) ; get next entry
+        (cond
+         ;; regular files
+         ((file-regular-p fn)
+          (add-to-list 'files fn))
+         ;; directories
+         ((and
+           (file-directory-p fn)
+           ;; ignore . and ..
+           (not (string-equal ".." (substring fn -2)))
+           (not (string-equal "." (substring fn -1))))
+          ;; we have to recurse into this directory
+          (setq files (append files (os-walk fn))))
+         )
+        ;; cut list down by an element
+        (setq current-list (cdr current-list)))
+      )
+    files))
+
+(defun full-os-walk (dir-inner)
+  (interactive)
+  (mapcar
+   (lambda (x) (princ (format " - [[%s][%s]]\n" x (file-relative-name x "."))))
+   (remove-if-not
+    (lambda (x) (string= (file-name-extension x) "org"))
+    (sort (os-walk dir-inner) (lambda (a b) (string< (convert-list-to-string a) (convert-list-to-string b)))))))
+
+(full-os-walk dir)
+
+(org-element-parse-buffer)
+
+(save-excursion
+  (org-link-search "tree")
+  (org-element--current-element 1 'greater-element))
+
+(save-excursion
+  (org-attach-dired-to-subtree '("."))
+  (org-element-map (org-element-parse-buffer 'headline) 'headline
+    (lambda (el)
+      (org-element-property :title el))))
+
+
+(mapcar
+ (lambda (arg)
+   (* arg 10))
+ full-range)
+
+(mapcar #'identity '(1 2 3)) ; => (1 2 3)
+(defvar x '(a b c d))
+(message "Mapped with %s: %s" 'identity (mapcar #'identity x)) ; => (a b c d)
+
+(defun symbol1 ()
+  "docstring"
+  ())
+
+(spacemacs|define-transient-state transient-state-fake
+  :title "VCS Transient State"
+  :doc "
+ Hunk Commands^^^^^^
+----------------------------^^^^^^
+ [_t_]^^^^      Run tests for current file
+ [_T_]^^^^      Run tests for whole project
+ [_\?_]^^^^      More commands? "
+  :on-enter (print "entered transient state")
+  :bindings
+  ("t" (lambda () (interactive) (print "HIT LETTER 't'")))
+  ("T" print-thingy :exit t)
+  ("q" nil :exit t))
+
+(spacemacs|define-micro-state micro-state-name
+  :doc "Some documentation stuff..?"
+  :use-minibuffer t
+  :evil-leader "X"
+  :bindings ("A" symbol1 :doc "documentation for symbol1"
+                     :pre (message "PRE")
+                     :post (message "POST")
+                     :exit (message "EXIT")))
