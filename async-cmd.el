@@ -71,9 +71,6 @@ window below and then close on success.")
 
 (provide 'async-split-below-cmd)
 
-(setv foo bar foo bar foo bar
-      foo bar)
-
 ;; EXAMPLE USAGE:
 ;; (setq command
 ;;       (async-split-below-cmd :name "list files"
