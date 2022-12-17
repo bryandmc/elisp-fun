@@ -68,14 +68,19 @@
 
 (require 'http)
 (require 'json)
+(require 'dash)
+(require 'cb-complete)
 
 (defun erl/remote-shell-select ()
   "connect to a remote node using erlang shell"
-  (interactive)
   (let* ((passwd
-          (read-passwd "Password for user 'Administrator'?: " nil "asdasd")))
+          (read-passwd "Password for user 'Administrator'?: " nil "asdasd"))
+         (completion-extra-properties
+          '(:annotation-function fancy-node-info-annotation)))
     (connect-erlang-remote-shell
-     (completing-read "Select which node to connect to: " (get-otp-nodes passwd)) passwd)))
+     (completing-read "Select which node to connect to: "
+                      (get-otp-nodes passwd))
+     passwd)))
 
 (defun get-erlang-cookie-local (&rest pass)
   "get the erlang cookie for the local node"
@@ -102,12 +107,16 @@
 (defun get-otp-nodes (&rest pass)
   "get all the otp nodes running locally by checking pools/default"
   (let* ((jsondata (pools/default "127.0.0.1:9000" pass)))
-    (mapcar
-     (lambda (item)
-       (let* ((otpnode
-               (plist-get item :otpNode)))
-         otpnode))
-     (plist-get jsondata :nodes))))
+    (--map (let*
+               ((otpnode (plist-get it :otpNode))
+                (svcs (plist-get it :services))
+                (server-group (plist-get it :serverGroup))
+                (encryption-enabled (plist-get it :nodeEncryption))
+                (version (plist-get it :version))
+                (display (format "services: %s version: %s group: %s encryption: %s"
+                                 svcs version server-group encryption-enabled)))
+             `(,otpnode ,display))
+           (plist-get jsondata :nodes))))
 
 (defun connect-erlang-remote-shell (&optional node pass)
   "connect to a remote shell"

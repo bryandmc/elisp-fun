@@ -25,7 +25,6 @@
            (not (string-equal "." (substring fn -1)))
            (not (equal nil (string-match-p "\\.git" (file-name-directory fn)))))
           ;; we have to recurse into this directory
-          (message "CURRENT: %s" )
           (setq files (append files (files/os-walk fn)))))
         ;; cut list down by an element
         (setq current-list (cdr current-list)))
