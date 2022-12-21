@@ -3,12 +3,14 @@
 ;;; Load the erlang stuff for sure
 (require 'erl)
 (require 'files)
+(require 'cb-complete)
+
 
 ;;;###autoload
-(defun cb/erl-remsh-select ()
+(defun cb/erl-remsh-select (host)
   "Remote shell"
-  (interactive)
-  (erl/remote-shell-select))
+  (interactive "MWhat host?:")
+  (erl/remote-shell-select host))
 
 ;;;###autoload
 (defun cb/erl-eunit-test-this ()

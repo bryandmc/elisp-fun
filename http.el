@@ -1,9 +1,7 @@
-(defun http/get-sync (url &rest pass)
+(defun http/get-sync (url password)
   "Go to URL as a GET request."
+  (message "Using URL: %s with password: %s" url password)
   (let* ((response-string-get nil)
-         (password (if pass
-                       (car (car pass))
-                     "asdasd"))
          (url-request-method "GET")
          (base64 (concat "Basic "
                          (base64-encode-string
@@ -21,13 +19,10 @@
     (kill-buffer (current-buffer))
     response-string-get))
 
-(defun http/post-sync (url eval-string &rest pass)
+(defun http/post-sync (url eval-string password)
   "Send EVAL-STRING to URL as a POST request."
   (let* ((response-string nil)
          (url-request-method "POST")
-         (password (if pass
-                       (car (car pass))
-                     "asdasd"))
          (base64 (concat "Basic "
                          (base64-encode-string
                           (concat "Administrator" ":" password))))

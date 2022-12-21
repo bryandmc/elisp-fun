@@ -71,18 +71,19 @@
 (require 'dash)
 (require 'cb-complete)
 
-(defun erl/remote-shell-select ()
+(defun erl/remote-shell-select (&optional host)
   "connect to a remote node using erlang shell"
   (let* ((passwd
           (read-passwd "Password for user 'Administrator'?: " nil "asdasd"))
+         (host (or host "127.0.0.1:9000"))
          (completion-extra-properties
-          '(:annotation-function fancy-node-info-annotation)))
+          '(:annotation-function cb-complete/fancy-annotate)))
     (connect-erlang-remote-shell
      (completing-read "Select which node to connect to: "
-                      (get-otp-nodes passwd))
+                      (get-otp-nodes host passwd))
      passwd)))
 
-(defun get-erlang-cookie-local (&rest pass)
+(defun get-erlang-cookie-local (pass)
   "get the erlang cookie for the local node"
   (http/post-sync
    "http://127.0.0.1:9000/diag/eval"
@@ -91,6 +92,7 @@
 
 (defun pools/default (host pass)
   "Get the pools/default data and parse it from json -> plist."
+  (message "Going to use password: %s" pass)
   (json-parse-string
    (http/get-sync
     (format "http://%s/pools/default" host) pass)
@@ -98,48 +100,55 @@
 
 (defun get-otp-node-name-local (&rest pass)
   "get local node's name"
-  (let* ((jsondata (pools/default "127.0.0.1:9000" pass))
+  (let* ((pass (or pass "asdasd"))
+         (jsondata (pools/default "127.0.0.1:9000" pass))
          (otpnode (plist-get
                    (aref (plist-get jsondata :nodes) 0) :otpNode)))
     (print otpnode)
     otpnode))
 
-(defun get-otp-nodes (&rest pass)
+(defun get-otp-nodes (host pass)
   "get all the otp nodes running locally by checking pools/default"
-  (let* ((jsondata (pools/default "127.0.0.1:9000" pass)))
+  (message "What is input?: %s:%s" host pass)
+  (let* ((jsondata (pools/default host pass)))
+    ;; (message "JSONDATA: %s" jsondata)
     (--map (let*
                ((otpnode (plist-get it :otpNode))
                 (svcs (plist-get it :services))
                 (server-group (plist-get it :serverGroup))
                 (encryption-enabled (plist-get it :nodeEncryption))
                 (version (plist-get it :version))
-                (display (format "services: %s version: %s group: %s encryption: %s"
-                                 svcs version server-group encryption-enabled)))
+                (status (if (equal "healthy"
+                                   (plist-get it :status))
+                            "✅ (good)"
+                          "❌ (bad)"))
+                (display (format "services: %s | version: %s | group: %s | encryption: %s | health status: %s"
+                                 svcs version server-group encryption-enabled status)))
              `(,otpnode ,display))
            (plist-get jsondata :nodes))))
 
-(defun connect-erlang-remote-shell (&optional node pass)
+(defun connect-erlang-remote-shell (node pass)
   "connect to a remote shell"
-  (interactive)
-  (let* ((node-name
+  (let* ((pass
+          (or pass "asdasd"))
+         (remsh-nodename
           (format "emacs-remote-shell-%s" (random 10000)))
+         (target-nodename
+          (or node (get-otp-node-name-local pass)))
          (erlang-cookie
           (get-erlang-cookie-local pass)))
     (inferior-erlang)
     (inferior-erlang-display-buffer)
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command
-     (format "net_kernel:start(['%s', longnames])." node-name))
+     (format "net_kernel:start(['%s', longnames])." remsh-nodename))
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command
      (format "erlang:set_cookie('%s')." erlang-cookie))
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command "")
     (inferior-erlang-wait-prompt)
-    (let* ((nodename (if node
-                         node
-                       (get-otp-node-name-local pass))))
-      (inferior-erlang-send-command (format "r '%s'" nodename)))
+    (inferior-erlang-send-command (format "r '%s'" target-nodename))
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command "c 2")
     (inferior-erlang-wait-prompt)))
