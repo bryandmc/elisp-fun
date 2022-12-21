@@ -9,7 +9,7 @@
 ;;;###autoload
 (defun cb/erl-remsh-select (host)
   "Remote shell"
-  (interactive "MWhat host?:")
+  (interactive (list (read-string "MWhat host?:" "127.0.0.1:9000")))
   (erl/remote-shell-select host))
 
 ;;;###autoload
