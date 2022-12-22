@@ -127,6 +127,14 @@
              `(,otpnode ,display))
            (plist-get jsondata :nodes))))
 
+;; (defun format-remote-conn-string (remote-name node-name host  cookie)
+;;   "format the remote connection string"
+;;   (let ((formatted-string (format "/usr/local/bin/fish -c 'erl -name %s@%s -remsh %s@%s -setcookie %s -hidden'" remote-name host node-name host cookie)))
+;;     (message "Here is formatted string: %S" formatted-string)
+;;     (term formatted-string)))
+
+;; (switch-to-buffer (format-remote-conn-string "n_666" "n_0" "127.0.0.1" "fc6fc910f7896a7f90d99fb63fa0acfbc7131f77801055ffdae64aa96e35243e"))
+
 (defun connect-erlang-remote-shell (node pass)
   "connect to a remote shell"
   (let* ((pass
