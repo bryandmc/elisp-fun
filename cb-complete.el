@@ -29,10 +29,51 @@
       (message "Whole line: %S" line)
       (list start end cb-complete-fake-keywords . nil ))))
 
+(defvar erl-module-dump-enabled nil "Whether or not we are dumping modules currently")
+
+(defvar erl-module-map (make-hash-table) "Hash table with all the modules")
+
 (defun erlshell-out-fun (args)
   "docstring"
-  (message "GOT OUTPUT ARGS: %s" args)
-  args)
+  (message "GOT OUTPUT ARGS: %s %s" (type-of args) args)
+  (when (ignore-errors (string-match "m()." args))
+    (setq erl-module-dump-enabled 't) ;; this is required so we know it's running on next pass
+    (message "w00000000t dumpstatus: %s" erl-module-dump-enabled))
+  (when erl-module-dump-enabled
+    (message "W00t the module dumping is enabled!!!!")
+    (erlshell-parse-modules args))
+
+  (message "After everything.."))
+
+(defun erlshell-parse-modules (args)
+  "Actually parse everythign.."
+  (message "Full args: %s" args)
+  (switch-to-buffer "erlang-module-parser")
+  (special-mode)
+
+
+  (when (string-match "Module.*" args)
+    ;; (insert (substring args (match-end 0) -1))
+    (let* ((temp1 (substring args (match-end 0) -1))
+
+           (temp3 (split-string temp1))
+           )
+      (insert temp3)
+      (message "LINES: %S" temp3)
+      (puthash temp2 nil erl-module-map))
+      ;; (message "GOT RESULT %s" temp2))
+    (error "something")
+    (message "STARTING!!!"))
+  ;; TODO Actually parse the data coming in.. not in a buffer, yet
+  ;; (setq erl-module-dump-enabled nil)
+  ;; (let* ((module ())
+  ;;        (path ()))
+  ;;
+  ;;   )
+  (when (string-match "ok" args)
+    (setq erl-module-dump-enabled nil)
+    (message "ENDING!!!"))
+  "Lulz")
 
 (defun erlshell-sender-fun (args &rest other last)
   "docstring"
@@ -47,8 +88,9 @@
 
 (define-derived-mode erlshell-mode erlang-shell-mode "erlshell"
   "Major mode for using erlang shell.."
-  (add-hook 'comint-redirect-filter-functions 'erlshell-filter-fun nil 'local)
-  (add-hook 'comint-preoutput-filter-functions 'erlshell-out-fun nil 'local)
+  (add-hook 'comint-redirect-filter-functions 'erlshell-filter-fun nil nil)
+  ;; (add-hook 'comint-preoutput-filter-functions 'erlshell-out-fun nil 'local)
+  (add-hook 'comint-output-filter-functions 'erlshell-out-fun nil nil)
   ;; (setq comint-input-sender 'erlshell-sender-fun)
   ;; (setq comint-process-echoes t)
   (add-hook 'completion-at-point-functions 'erlshell-completion-at-point nil 'local))

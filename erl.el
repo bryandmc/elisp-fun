@@ -146,6 +146,8 @@
          (erlang-cookie
           (get-erlang-cookie-local pass)))
     (inferior-erlang)
+    (erlshell-mode)
+    ;; (inferior-erlang-run-or-select)
     (inferior-erlang-display-buffer)
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command
@@ -159,6 +161,11 @@
     (inferior-erlang-send-command (format "r '%s'" target-nodename))
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command "c 2")
+    (inferior-erlang-wait-prompt)
+    (message "WE HAVE THIS SYMBOL: %S" (point))
+    ;;; This next command will output a bunch of module information that we
+    ;;; are going to steal to create a completion table.
+    (inferior-erlang-send-command "m().")
     (inferior-erlang-wait-prompt)))
 
 (provide 'erl)
