@@ -12,6 +12,8 @@
         "forall"
         ))
 
+(defvar erl-module-fn-map (make-hash-table) "")
+
 (defun erlshell-completion-at-point ()
   "This is the function to be used for the hook `completion-at-point-functions'."
   (interactive)
@@ -33,9 +35,9 @@
 
 (defvar erl-module-map (make-hash-table) "Hash table with all the modules")
 
-(defun erlshell-out-fun (args)
+(defun erlshell-out-fun (args &optional rest)
   "docstring"
-  (message "GOT OUTPUT ARGS: %s %s" (type-of args) args)
+  (message "GOT OUTPUT ARGS: %s %s OPTIONAL: %s" (type-of args) args rest)
   (when (ignore-errors (string-match "m()." args))
     (setq erl-module-dump-enabled 't) ;; this is required so we know it's running on next pass
     (message "w00000000t dumpstatus: %s" erl-module-dump-enabled))
@@ -51,6 +53,16 @@
   (switch-to-buffer "erlang-module-parser")
   (special-mode)
 
+  (let* ((splitted-str (split-string args))
+         (filtered-str (--filter (string-match "^[a-z_]*$" it) splitted-str))
+         )
+
+    (--each filtered-str (puthash it nil erl-module-map))
+    (message "RAW ARGS SPLIT: %s filtered: %s" splitted-str filtered-str))
+
+  (when (string-match "ok" args)
+    (setq erl-module-dump-enabled nil)
+    (message "ENDING!!!"))
 
   (when (string-match "Module.*" args)
     ;; (insert (substring args (match-end 0) -1))
@@ -58,22 +70,18 @@
 
            (temp3 (split-string temp1))
            )
-      (insert temp3)
+      (insert temp1)
       (message "LINES: %S" temp3)
-      (puthash temp2 nil erl-module-map))
-      ;; (message "GOT RESULT %s" temp2))
-    (error "something")
-    (message "STARTING!!!"))
+      ;; (puthash temp3 nil erl-module-map)
+
+      temp1))
   ;; TODO Actually parse the data coming in.. not in a buffer, yet
   ;; (setq erl-module-dump-enabled nil)
   ;; (let* ((module ())
   ;;        (path ()))
   ;;
   ;;   )
-  (when (string-match "ok" args)
-    (setq erl-module-dump-enabled nil)
-    (message "ENDING!!!"))
-  "Lulz")
+  )
 
 (defun erlshell-sender-fun (args &rest other last)
   "docstring"
@@ -103,3 +111,8 @@
     (when item (concat " - " (second item)))))
 
 (provide 'cb-complete)
+
+;; TODO: USE TAGS INSTEAD OF PARSING SHELL RESULTS
+;; It looks like we can use TAGS completion directly.. just need to maybe setup
+;; some routing or something. Don't have to parse the data from the shell if I don't
+;; want to anymore!!!

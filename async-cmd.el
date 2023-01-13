@@ -52,7 +52,7 @@ Valid options are: [':never-ran' ':running' ':success' ':failure'].")
     (setq new-buffer (get-buffer-create buf-name t))
     (setq-local new-window
                 (display-buffer-at-bottom new-buffer
-                                                 `(mode . `(shell-mode))))
+                                                 `(mode . `(special-mode))))
     (set-window-buffer new-window new-buffer t)
     ;; (other-window 1 nil t)
     (setq-local async/cmd-buffer buf-name)
