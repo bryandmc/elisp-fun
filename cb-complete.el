@@ -105,7 +105,7 @@
 
 (provide 'erlshell-mode)
 
-(defun cb-complete/fancy-annotate (s)
+(defun complete/fancy-annotate-nodelist (s)
   (message "Minibuffer completion table: %s" minibuffer-completion-table)
   (let ((item (assoc s minibuffer-completion-table)))
     (when item (concat " - " (second item)))))

@@ -14,8 +14,6 @@
     (`:PUT "PUT")
     (`:DELETE "DELETE")))
 
-(http-method-symbol-to-string :GET)
-
 (defun b64-basic-auth-password (password)
   "Get the basic auth header for the password provided."
   (concat "Basic "
@@ -26,55 +24,47 @@
   `(("Accept" . "*/*")
     ("Authorization" . ,base64)))
 
-(defun create-form-headers2 (base64)
-  `(,(basic-auth-headers base64)
-   ("Content-Type" . "application/x-www-form-urlencoded")))
-
 (defun form-headers (base64)
   `(("Content-Type" . "application/x-www-form-urlencoded")
     ("Accept" . "*/*")
     ("Authorization" . ,base64)))
 
 
-(defmacro http-get-boilerplate (url password &rest body)
+(defmacro http-get-boilerplate (url credentials &rest body)
   "Macro containing the majority of the logic for getting strings from http requests."
   `(progn
-     (message "Using URL: %s with password: %s" url password)
-     (let* ((response-string-get nil)
-            (url-request-method (http-method-symbol-to-string :GET))
-            (base64 (b64-basic-auth-password password))
+     (message "Using URL: %s with password: %s" url credentials)
+     (let* ((url-request-method (http-method-symbol-to-string :GET))
+            (base64 (b64-basic-auth-password (password credentials)))
             (url-request-extra-headers (basic-auth-headers base64)))
        (switch-to-buffer
         (,@body url)) ;; synchronous / asynchronous (using macro)
        (goto-char (point-min))
        (re-search-forward "\n\n")
-       (setq response-string-get
-             (buffer-substring-no-properties (point) (point-max)))
-       (print response-string-get)
-       (kill-buffer (current-buffer))
-       response-string-get)))
+       (current-buffer))))
 
 (defun http/get-sync (url password)
   (http-get-boilerplate url password
                         (lambda (url)
                           (url-retrieve-synchronously url))))
 
-(aio-defun http/get-async (url password)
-  (http-get-boilerplate url password
+(aio-defun http/get-async (url credentials)
+  (http-get-boilerplate url credentials
                         (lambda (url)
+                          (message "Got url: %s" url)
                           (cdr (aio-await (aio-url-retrieve url))))))
 
-(defun test-async-get (url password)
-  (aio-wait-for (http/get-async url password)))
+;; (defun test-async-get (url password)
+;;   (aio-wait-for (http/get-async url password)))
 
-(test-async-get "http://127.0.0.1:9000" "asdasd")
+;; (test-async-get "http://127.0.0.1:9000" "asdasd")
 
-(defmacro http-post-boilerplate (url eval password &rest body)
+(defmacro http-post-boilerplate (url eval credentials &rest body)
   "Macro containing boilerplate for http requests.. sync and async"
   `(progn
      (let* ((response-string nil)
             (url-request-method (http-method-symbol-to-string :POST))
-            (base64 (b64-basic-auth-password password))
+            (base64 (b64-basic-auth-password (password credentials)))
             (url-request-extra-headers (form-headers base64))
             (url-request-data eval))
        (print url-request-data)
@@ -82,25 +72,22 @@
         (,@body url)) ;; synchronous / asynchronous (using macro)
        (goto-char (point-min))
        (re-search-forward "\n\n")
-       (setq response-string
-             (buffer-substring-no-properties (point) (point-max)))
-       (kill-buffer (current-buffer))
-       response-string)))
+       (current-buffer))))
 
-(defun http/post-sync (url eval password)
-  (http-post-boilerplate url eval password
+(defun http/post-sync (url eval credentials)
+  (http-post-boilerplate url eval credentials
                          (lambda (url)
                            (url-retrieve-synchronously url))))
 
-(aio-defun http/post-async (url eval password)
-  (http-post-boilerplate url eval password
+(aio-defun http/post-async (url eval credentials)
+  (http-post-boilerplate url eval credentials
                          (lambda (url)
                            (cdr (aio-await (aio-url-retrieve url))))))
 
-(defun test-async-post (url eval password)
-  (aio-wait-for (http/post-async url eval password)))
+;; (defun test-async-post (url eval password)
+;;   (aio-wait-for (http/post-async url eval password)))
 
-(test-async-post "http://127.0.0.1:9000" "ns_config:get()." "asdasd")
+;; (test-async-post "http://127.0.0.1:9000" "ns_config:get()." "asdasd")
 
 ;; (message "AIO-BLAH: %s"
 ;;          (aio-with-async

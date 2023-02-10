@@ -6,21 +6,14 @@
 (require 'cb-complete)
 (require 'aio)
 
-
 ;;;###autoload
-(defun cb/erl-remsh-select (host)
-  "Remote shell"
-  (interactive (list (read-string "MWhat host?:" "127.0.0.1:9000")))
-  (erl/remote-shell-select host))
-
-;;;###autoload
-(defun cb/remsh-select (host)
-  "Remote shell"
+(defun cb/connect-erl-shell (host)
+  "Connect to an Erlang remote shell."
   (interactive
    (list
-    (read-string "MWhat host?:" "127.0.0.1:9000")))
+    (read-string "What host?:" "127.0.0.1:9000")))
   (aio-wait-for
-   (async/remsh-select host)))
+   (async/connect-shell host)))
 
 ;;;###autoload
 (defun cb/erl-eunit-test-this ()
