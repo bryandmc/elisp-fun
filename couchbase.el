@@ -5,6 +5,7 @@
 (require 'files)
 (require 'cb-complete)
 (require 'aio)
+(require 'gerrit)
 
 ;;;###autoload
 (defun cb/connect-erl-shell (host)

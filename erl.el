@@ -7,7 +7,8 @@
 (require 'aio)
 
 ;;; honestly this test command works just as well as the custom one.. custom one
-;;; needs more work but is fully configurable. ###autoload
+;;; needs more work but is fully configurable.
+;;;###autoload
 (defun erl/test ()
   (interactive)
   (print "Running tests")
@@ -177,16 +178,22 @@
                       (format "http://%s/diag/eval" host)
                       "erlang:get_cookie()."
                       credentials))))
-    (with-current-buffer cookie-buffer
-      (let* ((response-string
-              (buffer-substring-no-properties (point) (point-max))))
-        (make-cookie :value response-string)))))
+    (let* ((response
+            (with-current-buffer cookie-buffer
+              (let* ((response-string
+                      (buffer-substring-no-properties (point) (point-max))))
+                (make-cookie :value response-string)))))
+      (kill-buffer cookie-buffer)
+      response)))
 
 (defun configure-erl-shell (config cookie credentials node)
   "connect to a remote shell.. asynchronously (sorta)"
-  (let* ((remsh-nodename
-          (format "emacs-remote-shell-%s" (random 10000)))
-         (target-nodename (message "%s" node)))
+  (let* ((target-nodename (message "%s" node))
+         (connect-host
+          (car (cdr (split-string target-nodename "@"))))
+         (remsh-nodename
+          (format "emacs-remote_%s@%s"
+                  (random 10000) connect-host)))
     (inferior-erlang)
     (inferior-erlang-display-buffer)
     (inferior-erlang-wait-prompt)
@@ -197,6 +204,9 @@
      (format "erlang:set_cookie(%s)."
              (cookie/unwrap cookie)))
     (inferior-erlang-wait-prompt)
+    (inferior-erlang-send-command
+     (format "net_kernel:hidden_connect_node('%s')." target-nodename))
+    (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command "")
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command (format "r '%s'" target-nodename))
@@ -205,5 +215,36 @@
     (inferior-erlang-wait-prompt)
     (inferior-erlang-send-command "m(active_cache).")
     (inferior-erlang-wait-prompt)))
+
+;;;###autoload
+(defun lookup-erl-docs-online (&optional args)
+  "docstring"
+  (interactive)
+  (setq module (nth 1 (erlang-id-to-list
+                       (erlang-get-identifier-at-point)))
+        name (nth 2 (erlang-id-to-list
+                     (erlang-get-identifier-at-point)))
+        arity (nth 3 (erlang-id-to-list
+                      (erlang-get-identifier-at-point))))
+  (setq module (if module module "erlang"))
+  (message
+   "Looking up erlang documentation (module: %s, function: %s, arity: %d)"
+   module name arity)
+  (browse-url
+   (format "https://www.erlang.org/doc/man/%s.html#%s-%d"
+           module name arity)))
+
+;;;###autoload
+(defun lookup-file-online-opengrok (&optional args)
+  "docstring"
+  (interactive)
+  (setq gitrev (string-trim (shell-command-to-string "git rev-parse --short couchbase/master"))  ;; "5fc651d34"
+        projpath (spacemacs/projectile-copy-file-path)
+        linenum (line-number-at-pos))
+  (setq module (if module module "erlang"))
+  (message "%s, %s, %s" gitrev projpath linenum)
+  (browse-url
+   (format "https://src.couchbase.org/source/xref/trunk/ns_server/%s?r=%s#%s"
+           projpath gitrev linenum)))
 
 (provide 'erl)

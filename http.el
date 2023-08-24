@@ -7,7 +7,7 @@
 (defconst HTTP-METHODS '(:GET :POST :PUT :DELETE)
   "The possible symbols that represent HTTP methods.")
 
-(defun http-method-symbol-to-string (method)
+(defun http-method->string (method)
   (pcase method
     (`:GET "GET")
     (`:POST "POST")
@@ -29,19 +29,39 @@
     ("Accept" . "*/*")
     ("Authorization" . ,base64)))
 
+(defmacro http-get-boilerplate-callback (url credentials body after)
+  "Macro containing the majority of the logic for getting strings from http requests."
+  (let* ((url-request-method (http-method->string :GET)))
+    `(progn
+       (message "INSIDE PROGN")
+       (switch-to-buffer
+        (aio-result (if credentials
+                        (let* ((base64 (b64-basic-auth-password (password credentials)))
+                               (url-request-extra-headers (basic-auth-headers base64)))
+                          (message "INNER LET")
+                          (body url)) ;; synchronous / asynchronous (using macro)
+                      (funcall body url)))) ;; synchronous / asynchronous (using macro)
+       (message "AFTER LET")
+       (goto-char (point-min))
+       (re-search-forward "\n\n")
+       (funcall after)
+       (current-buffer))))
 
 (defmacro http-get-boilerplate (url credentials &rest body)
   "Macro containing the majority of the logic for getting strings from http requests."
   `(progn
-     (message "Using URL: %s with password: %s" url credentials)
-     (let* ((url-request-method (http-method-symbol-to-string :GET))
-            (base64 (b64-basic-auth-password (password credentials)))
-            (url-request-extra-headers (basic-auth-headers base64)))
-       (switch-to-buffer
-        (,@body url)) ;; synchronous / asynchronous (using macro)
-       (goto-char (point-min))
-       (re-search-forward "\n\n")
-       (current-buffer))))
+     (if credentials
+         (let* ((url-request-method (http-method->string :GET))
+                (base64 (b64-basic-auth-password (password credentials)))
+                (url-request-extra-headers (basic-auth-headers base64)))
+           (switch-to-buffer
+            (,@body url))) ;; synchronous / asynchronous (using macro)
+       (let* ((url-request-method (http-method->string :GET)))
+         (switch-to-buffer
+          (,@body url))))
+     (goto-char (point-min))
+     (re-search-forward "\n\n")
+     (current-buffer)))
 
 (defun http/get-sync (url password)
   (http-get-boilerplate url password
@@ -51,19 +71,13 @@
 (aio-defun http/get-async (url credentials)
   (http-get-boilerplate url credentials
                         (lambda (url)
-                          (message "Got url: %s" url)
                           (cdr (aio-await (aio-url-retrieve url))))))
-
-;; (defun test-async-get (url password)
-;;   (aio-wait-for (http/get-async url password)))
-
-;; (test-async-get "http://127.0.0.1:9000" "asdasd")
 
 (defmacro http-post-boilerplate (url eval credentials &rest body)
   "Macro containing boilerplate for http requests.. sync and async"
   `(progn
      (let* ((response-string nil)
-            (url-request-method (http-method-symbol-to-string :POST))
+            (url-request-method (http-method->string :POST))
             (base64 (b64-basic-auth-password (password credentials)))
             (url-request-extra-headers (form-headers base64))
             (url-request-data eval))
@@ -84,19 +98,6 @@
                          (lambda (url)
                            (cdr (aio-await (aio-url-retrieve url))))))
 
-;; (defun test-async-post (url eval password)
-;;   (aio-wait-for (http/post-async url eval password)))
-
-;; (test-async-post "http://127.0.0.1:9000" "ns_config:get()." "asdasd")
-
-;; (message "AIO-BLAH: %s"
-;;          (aio-with-async
-;;            (aio-wait-for
-;;             (aio-all
-;;              (list
-;;               (async/otp-node-name "asdasd")
-;;               (async/erlang-cookie "asdasd"))))))
-
 (defun fetch-bounded (url-list max-parallel callback)
   (let ((sem (aio-sem max-parallel)))
     (dolist (url url-list)
@@ -109,10 +110,5 @@
                    (with-current-buffer buffer
                      (prog1 (buffer-string)
                        (kill-buffer)))))))))
-
-;; (fetch '("http://google.com" "http://youtube.com" "http://yahoo.com") 3 (lambda (val) (message "val: %s" val)))
-;; (aio-listen (aio-await async/erlang-cookie "asdasd") (lambda (item) (message "ITEM AIO-LISTEN: %s" item)))
-;; (aio-with-async (async/erlang-cookie "asdasd"))
-
 
 (provide 'http)
